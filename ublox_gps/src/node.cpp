@@ -52,6 +52,7 @@
 #include <ublox_msgs/msg/inf.hpp>
 #include <ublox_msgs/msg/mon_ver.hpp>
 #include <ublox_msgs/msg/nav_clock.hpp>
+#include <ublox_msgs/msg/nav_cov.hpp>
 #include <ublox_msgs/msg/nav_posecef.hpp>
 #include <ublox_msgs/msg/nav_status.hpp>
 
@@ -190,6 +191,10 @@ UbloxNode::UbloxNode(const rclcpp::NodeOptions & options) : rclcpp::Node("ublox_
   initialize();
 }
 
+void UbloxNode::rtcmCallback(const rtcm_msgs::msg::Message::SharedPtr msg) {
+  gps_->sendRtcm(msg->message);
+}
+
 void UbloxNode::addFirmwareInterface() {
   int ublox_version;
   if (protocol_version_ < 14.0) {
@@ -225,10 +230,13 @@ void UbloxNode::addProductInterface(const std::string & product_category,
     components_.push_back(std::make_shared<AdrUdrProduct>(nav_rate_, meas_rate_, frame_id_, updater_, this));
   } else if (product_category == "FTS") {
     components_.push_back(std::make_shared<FtsProduct>());
-  } else if (product_category == "SPG") {
+  } else if (product_category == "HPS") {
+    components_.push_back(std::make_shared<AdrUdrProduct>(nav_rate_, meas_rate_, frame_id_, updater_, this));
+    components_.push_back(std::make_shared<HpgRovProduct>(nav_rate_, updater_, this));
+  } else {
     RCLCPP_WARN(this->get_logger(), "Product category %s %s from MonVER message not recognized %s",
                 product_category.c_str(), ref_rov.c_str(),
-                "options are HPG REF, HPG ROV, HPG #.#, TIM, ADR, UDR, FTS, SPG");
+                "options are HPG REF, HPG ROV, HPG #.#, TIM, ADR, UDR, FTS, HPS");
   }
 }
 
@@ -403,6 +411,7 @@ void UbloxNode::getRosParams() {
   this->declare_parameter("publish.nav.all", getRosBoolean(this, "publish.all"));
   this->declare_parameter("publish.nav.att", getRosBoolean(this, "publish.nav.all"));
   this->declare_parameter("publish.nav.clock", getRosBoolean(this, "publish.nav.all"));
+  this->declare_parameter("publish.nav.cov", getRosBoolean(this, "publish.nav.all"));
   this->declare_parameter("publish.nav.heading", getRosBoolean(this, "publish.nav.all"));
   this->declare_parameter("publish.nav.posecef", getRosBoolean(this, "publish.nav.all"));
   this->declare_parameter("publish.nav.posllh", getRosBoolean(this, "publish.nav.all"));
@@ -465,8 +474,8 @@ void UbloxNode::getRosParams() {
   if (getRosBoolean(this, "publish.nav.posecef")) {
     nav_posecef_pub_ = this->create_publisher<ublox_msgs::msg::NavPOSECEF>("navposecef", 1);
   }
-  if (getRosBoolean(this, "publish.nav.clock")) {
-    nav_clock_pub_ = this->create_publisher<ublox_msgs::msg::NavCLOCK>("navclock", 1);
+  if (getRosBoolean(this, "publish.nav.cov")) {
+    nav_cov_pub_ = this->create_publisher<ublox_msgs::msg::NavCOV>("navcov", 1);
   }
   if (getRosBoolean(this, "publish.nav.clock")) {
     nav_clock_pub_ = this->create_publisher<ublox_msgs::msg::NavCLOCK>("navclock", 1);
@@ -480,6 +489,9 @@ void UbloxNode::getRosParams() {
   if (getRosBoolean(this, "publish.aid.hui")) {
     aid_hui_pub_ = this->create_publisher<ublox_msgs::msg::AidHUI>("aidhui", 1);
   }
+
+  // Create subscriber for RTCM correction data to enable RTK
+  this->subscription_ = this->create_subscription<rtcm_msgs::msg::Message>("/rtcm", 10, std::bind(&UbloxNode::rtcmCallback, this, std::placeholders::_1));
 }
 
 void UbloxNode::keepAlive() {
@@ -534,6 +546,11 @@ void UbloxNode::subscribe() {
 
   if (getRosBoolean(this, "publish.nav.clock")) {
     gps_->subscribe<ublox_msgs::msg::NavCLOCK>([this](const ublox_msgs::msg::NavCLOCK &m) { nav_clock_pub_->publish(m); },
+                                          1);
+  }
+
+  if (getRosBoolean(this, "publish.nav.cov")) {
+    gps_->subscribe<ublox_msgs::msg::NavCOV>([this](const ublox_msgs::msg::NavCOV &m) { nav_cov_pub_->publish(m); },
                                           1);
   }
 
