@@ -581,6 +581,11 @@ bool Gps::sendRtcm(const std::vector<uint8_t>& rtcm) {
   return true;
 }
 
+bool Gps::send(const std::vector<uint8_t>& msg) {
+  worker_->send(msg.data(), msg.size());
+  return true;
+}
+
 bool Gps::poll(uint8_t class_id, uint8_t message_id,
                const std::vector<uint8_t>& payload) {
   if (!worker_) {

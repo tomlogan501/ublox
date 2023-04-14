@@ -135,6 +135,12 @@ class Gps final {
   bool sendRtcm(const std::vector<uint8_t> &message);
 
   /**
+   * @brief Send data to the connected device.
+   * @param message data to be send
+   */
+  bool send(const std::vector<uint8_t> &data);
+
+  /**
    * @brief Closes the I/O port, and initiates save on shutdown procedure
    * if enabled.
    */

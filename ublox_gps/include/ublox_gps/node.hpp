@@ -37,6 +37,7 @@
 // ROS includes
 #include <diagnostic_updater/diagnostic_updater.hpp>
 #include <rclcpp/rclcpp.hpp>
+#include <std_msgs/msg/float64.hpp>
 // U-Blox msgs nicludes
 #include <ublox_msgs/msg/cfg_cfg.hpp>
 #include <ublox_msgs/msg/cfg_dat.hpp>
@@ -143,9 +144,19 @@ class UbloxNode final : public rclcpp::Node {
   void rtcmCallback(const rtcm_msgs::msg::Message::SharedPtr msg);
 
   /**
+   * @brief Callback for '/velocity' subscription to handle Speed data for ESF
+   */
+  void speedCallback(const std_msgs::msg::Float64::SharedPtr msg);
+
+  /**
    * @brief Subscription handler for RTCM data
    */
   rclcpp::Subscription<rtcm_msgs::msg::Message>::SharedPtr subscription_;
+
+    /**
+   * @brief Subscription handler for speed data
+   */
+  rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr subscription2_;
 
   /**
    * @brief Initialize the I/O handling.

@@ -49,6 +49,7 @@
 #include <ublox_msgs/msg/cfg_inf_block.hpp>
 #include <ublox_msgs/msg/cfg_nav5.hpp>
 #include <ublox_msgs/msg/cfg_prt.hpp>
+#include <ublox_msgs/msg/esf_meas.hpp>
 #include <ublox_msgs/msg/inf.hpp>
 #include <ublox_msgs/msg/mon_ver.hpp>
 #include <ublox_msgs/msg/nav_clock.hpp>
@@ -193,6 +194,17 @@ UbloxNode::UbloxNode(const rclcpp::NodeOptions & options) : rclcpp::Node("ublox_
 
 void UbloxNode::rtcmCallback(const rtcm_msgs::msg::Message::SharedPtr msg) {
   gps_->sendRtcm(msg->message);
+}
+
+void UbloxNode::speedCallback(const std_msgs::msg::Float64::SharedPtr speed) {
+  // Prepare message as UBX_ESF_FORMAT
+  ublox_msgs::msg::EsfMEAS msg;
+  
+  rclcpp::Time now = this->get_clock()->now();
+  msg.time_tag = now.nanoseconds() / 1000000;
+  // TODO add the speed
+
+  //gps_->send(msg);
 }
 
 void UbloxNode::addFirmwareInterface() {
@@ -492,6 +504,8 @@ void UbloxNode::getRosParams() {
 
   // Create subscriber for RTCM correction data to enable RTK
   this->subscription_ = this->create_subscription<rtcm_msgs::msg::Message>("/rtcm", 10, std::bind(&UbloxNode::rtcmCallback, this, std::placeholders::_1));
+  // Create subscriber for speed data to send to ESF
+  this->subscription2_ = this->create_subscription<std_msgs::msg::Float64>("/velocity", 10, std::bind(&UbloxNode::speedCallback, this, std::placeholders::_1));
 }
 
 void UbloxNode::keepAlive() {
